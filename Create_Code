@@ -1,0 +1,57 @@
+import sqlite3
+
+#Make a connection using file ‘15.2_Counting_Email_in_a_Database.sqlite’
+conn = sqlite3.connect('15.2_Counting_Email_in_a_Database.sqlite')
+cur = conn.cursor()
+
+#If the table already exists, remove the table
+cur.execute('DROP TABLE IF EXISTS Counts')
+
+#Create a new table with an ‘email’ column and a ‘count’ column
+cur.execute('''
+CREATE TABLE Counts (email TEXT, count INTEGER)''')
+
+#Prompt for the User to give a file name, and default to ‘mbox-short.txt’ if blank
+fname = input('Enter file name: ')
+if (len(fname) < 1): fname = 'mbox-short.txt'
+#Open and read the file
+fh = open(fname)
+#Loop through the file
+for line in fh:
+    #Look for lines that start with ‘From:’ and skip the rest
+    #Split the line and return the 2nd segment- the email
+    if not line.startswith('From: '): continue
+    pieces = line.split()
+    email = pieces[1]
+    #Split the email at the ‘@’ character, returning the 
+    #2nd segment- the domain (for the organization)
+    email_domain = email.split('@')
+    email_pieces = email_domain[1]
+    #Open the record; Select the ‘count’ column from the ‘Counts’ table, 
+    #using ‘email_pieces’ for the ‘email’ column
+    cur.execute('SELECT count FROM Counts WHERE email = ? ', (email_pieces,))
+    #Grab the next row from the database
+    row = cur.fetchone()
+    #If the email domain (organization) does not have a row, create a row, 
+    #add the email domain under ‘email’, and add a count of 1 for ‘count’
+    if row is None:
+        cur.execute('''INSERT INTO Counts (email, count)
+                VALUES (?, 1)''', (email_pieces,))
+    #If the email domain (organization) has a row, update it and add 1 to the count (increment)
+    else:
+        cur.execute('UPDATE Counts SET count = count + 1 WHERE email = ?',
+                    (email_pieces,))
+    #Commit- write to memory
+    conn.commit()
+
+#Select all of the ‘emails’ and corresponding ‘counts’ (in the ‘Counts’ table)
+#sort by the ‘counts’ in descending order (largest count to smallest)
+sqlstr = 'SELECT email, count FROM Counts ORDER BY count DESC'
+
+#Execute the above ‘sqlstr’ statement and print the email (row[0]) 
+#and the corresponding count (row[1])
+for row in cur.execute(sqlstr):
+    print(str(row[0]), row[1])
+
+#Close the connection
+cur.close()
